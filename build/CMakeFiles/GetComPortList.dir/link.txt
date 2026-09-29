@@ -1,0 +1,2 @@
+/usr/bin/ar qc libGetComPortList.a CMakeFiles/GetComPortList.dir/libs/GetComPortList/GetComPortList.cpp.o
+/usr/bin/ranlib libGetComPortList.a
