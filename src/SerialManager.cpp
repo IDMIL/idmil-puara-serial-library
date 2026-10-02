@@ -1,46 +1,61 @@
 #include "SerialManager.h"
 
-#include <GetComPortList.h>
-
 #include <cstring>
+#include <latch>
+#include <thread>
 
-PuaraAPI::SerialManager::SerialManager() {
-    for (const std::string& portName : GetComPortList::get_list_serial_ports()) {
-        SerialPort port = std::make_unique<serial::Serial>(
-            portName, 
-            BAUD_RATE, 
-            serial::Timeout::simpleTimeout(READ_WRITE_TIMEOUT_MS)
-        );
-        ports.push_back(std::move(port));
+void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPort>& ports) {
+    std::vector<SerialPort> openPorts;
+    
+    DEBUG_PRINT("Creating port objects");
+
+    for (auto& portInfo : serial::list_ports()) {
+        std::string portName = portInfo.port;
+
+#if __APPLE__
+        if (portName.find("Bluetooth") != std::string::npos || portName.find("debug") != std::string::npos) {
+            continue;
+        }
+#endif
+
+        DEBUG_PRINT(std::format("Creating port for {}", portName));
+        try {
+            openPorts.push_back(std::make_shared<serial::Serial>(
+                portName,
+                BAUD_RATE,
+                serial::Timeout::simpleTimeout(READ_WRITE_TIMEOUT_MS)
+            ));
+            DEBUG_PRINT("Success");
+        }
+        catch (...) { DEBUG_PRINT("Failure"); }
     }
+
+    DEBUG_PRINT("Done creating port objects");
+
+    std::vector<std::string> portResponses = sendCommandMultiple(openPorts, "ping");
+
+    DEBUG_PRINT("Moving ports that responded to output vector");
+    ports.clear();
+
+    for (size_t i = 0; i < portResponses.size(); i++) {
+        if (!portResponses[i].empty()) {
+            ports.push_back(openPorts[i]);
+        }
+    }
+
+    DEBUG_PRINT("Done moving; scan complete");
 }
 
-void PuaraAPI::SerialManager::scan(std::vector<bool>& mask) {
-    assert(mask.size() == ports.size());
-
-    for (size_t i = 0; i < ports.size(); i++) {
-        SerialPort& port = ports[i];
-
-        // If the port isn't open, try opening it first
-        if (!port->isOpen()) {
-            try {
-                port->open();
-            }
-            catch (...) {
-                mask[i] = false;
-            }
-        }
-
-        // Try sending a ping
-        if (port->isOpen()) {
-            std::string response = sendCommand(port, "ping");
-            mask[i] = !response.empty();
-        }
-    }
-}
-
-// TODO: Error handling
 std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::string& command) {
+    if (!port->isOpen()) {
+        try {
+            port->open();
+        }
+        catch (...) {
+            return "";
+        }
+    }
+
     port->write(command);
     std::string response = "";
 
@@ -56,6 +71,35 @@ std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::st
     }
 
     return response;
+}
+
+std::vector<std::string> PuaraAPI::SerialManager::sendCommandMultiple(std::vector<SerialPort>& ports, const std::string& command) {
+    if (ports.size() == 0) {
+        return {};
+    }
+    
+    std::vector<std::string> result(ports.size(), "");
+    std::latch l(ports.size());
+
+    auto threadTask = [&](SerialPort& port, const std::string& command, size_t resultIdx){
+        std::string response = sendCommand(port, command);
+        result[resultIdx] = response;
+        l.count_down();
+    };
+
+    std::vector<std::thread> workers;
+
+    for (size_t i = 0; i < ports.size(); i++) {
+        workers.push_back(std::thread(threadTask, std::ref(ports[i]), command, i));
+    }
+
+    l.wait();
+
+    for (auto& worker : workers) {
+        worker.join();
+    }
+
+    return result;
 }
 
 bool PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& configSettings) {

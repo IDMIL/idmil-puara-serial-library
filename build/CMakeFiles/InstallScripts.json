@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/foobiane/Projects/idmil-puara-serial-library/build/cmake_install.cmake",
-		"/Users/foobiane/Projects/idmil-puara-serial-library/build/libs/json/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

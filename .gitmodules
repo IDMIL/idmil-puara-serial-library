@@ -4,6 +4,3 @@
 [submodule "libs/json"]
 	path = libs/json
 	url = https://github.com/nlohmann/json
-[submodule "libs/GetComPortList"]
-	path = libs/GetComPortList
-	url = https://github.com/nkinar/GetComPortList

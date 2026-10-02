@@ -1,7 +1,8 @@
-#include "SerialManager.h"
+#include <SerialManager.h>
 
 #include <nlohmann/json.hpp>
 
+#include <csignal>
 #include <format>
 #include <fstream>
 #include <iostream>
@@ -10,11 +11,15 @@ using nlohmann::json;
 
 // Forward declares
 void invalidMsg();
-void modificationMenu(PuaraAPI::SerialManager&, size_t, bool);
+void modificationMenu(PuaraAPI::SerialManager::SerialPort&, bool);
+
+// SIGINT
+void handler(int) {
+    exit(0);
+}
 
 int main() {
-    PuaraAPI::SerialManager manager;
-    std::vector<bool> mask(manager.ports.size(), false);
+    std::signal(SIGINT, handler);
 
     std::cout << 
         "Puara Serial Tool: Command-line utility for managing Puara instruments over serial\n"
@@ -22,19 +27,18 @@ int main() {
         "Created by Ian Doherty, September 2026\n"
     << std::endl;
 
+    std::vector<PuaraAPI::SerialManager::SerialPort> ports;
+
     while (1) {
         std::string msg = "1. Scan\n";
         int n = 2;
 
-        for (size_t i = 0; i < mask.size(); i++) {
-            if (mask[i]) {
-                std::string name = manager.sendCommand(manager.ports[i], "whatareyou");
+        std::vector<std::string> deviceNames = PuaraAPI::SerialManager::sendCommandMultiple(ports, "whatareyou");
 
-                msg += std::format("{}. Configure \"{}\"\n", std::to_string(n), name);
-                msg += std::format("{}. Change settings for \"{}\"\n", std::to_string(n + 1), name);
-
-                n += 2;
-            }
+        for (auto& name : deviceNames) {
+            msg += std::format("{}. Configure \"{}\"\n", std::to_string(n), name);
+            msg += std::format("{}. Change settings for \"{}\"\n", std::to_string(n + 1), name);
+            n += 2;
         }
 
         std::cout << msg;
@@ -44,28 +48,17 @@ int main() {
         std::cin >> choice;
 
         if (choice == 1) {
-            manager.scan(mask);
+            DEBUG_PRINT("Starting scan");
+            PuaraAPI::SerialManager::scan(ports);
+            DEBUG_PRINT("Ending scan");
         }
         else if (choice < 0 || choice > n) {
             invalidMsg();
         }
         else {
-            int whichActiveDevice = (choice - 2) / 2;
+            int portIdx = (choice - 2) / 2;
             bool configuring = (choice % 2 == 1);
-
-            // Bluntly converting an "active device index" to a concrete port vector index
-            int portIdx;
-            for (int i = 0; i < mask.size(); i++) {
-                if (mask[i] && whichActiveDevice == 0) {
-                    portIdx = i;
-                    break;
-                }
-                else if (mask[i]) {
-                    whichActiveDevice--;
-                }
-            }
-
-            modificationMenu(manager, portIdx, configuring);
+            modificationMenu(ports[portIdx], configuring);
         }
     }
 
@@ -76,7 +69,7 @@ void invalidMsg() {
     std::cout << "Invalid input, please try again." << std::endl;
 }
 
-void modificationMenu(PuaraAPI::SerialManager& manager, size_t portIdx, bool configuration) {
+void modificationMenu(PuaraAPI::SerialManager::SerialPort& port, bool configuration) {
     std::string msg = (
         configuration ? "1. Configure via JSON\n2. Configure manually" :
         "1. Change settings via JSON\n2. Change settings manually"
@@ -111,7 +104,7 @@ void modificationMenu(PuaraAPI::SerialManager& manager, size_t portIdx, bool con
             "readsettings"
         );
 
-        modificationJson = json::parse(manager.sendCommand(manager.ports[portIdx], command));
+        modificationJson = json::parse(PuaraAPI::SerialManager::sendCommand(port, command));
 
         for (auto& [key, value] : modificationJson.items()) {
             std::string newValue;
@@ -123,7 +116,7 @@ void modificationMenu(PuaraAPI::SerialManager& manager, size_t portIdx, bool con
     }
 
     if (configuration) {
-        if (!manager.changeConfig(manager.ports[portIdx], modificationJson)) {
+        if (!PuaraAPI::SerialManager::changeConfig(port, modificationJson)) {
             std::cout << "Config failed, please try again." << std::endl;
         }
         else {
@@ -131,7 +124,7 @@ void modificationMenu(PuaraAPI::SerialManager& manager, size_t portIdx, bool con
         }
     }
     else {
-        if (!manager.changeSettings(manager.ports[portIdx], modificationJson)) {
+        if (!PuaraAPI::SerialManager::changeSettings(port, modificationJson)) {
             std::cout << "Settings change failed, please try again." << std::endl;
         }
         else {

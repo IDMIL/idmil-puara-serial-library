@@ -3,36 +3,49 @@ cmake_minimum_required(VERSION 3.5)
 set(CMAKE_CXX_STANDARD 20) # needed for std::format, std::filesystem
 set(CMAKE_CXX_FLAGS "-Wall")
 
-project(puara-serial-library)
-
-# GetComPortList library
-add_library(GetComPortList)
-target_sources(GetComPortList
-    PRIVATE
-        libs/GetComPortList/GetComPortList.cpp
-)
-target_include_directories(GetComPortList
-    PUBLIC
-        libs/GetComPortList
-)
+project(idmil-puara-serial-library)
 
 # JSON library
 add_subdirectory(libs/json)
 
 # Serial library
-add_library(serial)
+add_library(serial STATIC)
 
-IF (WIN32)
-    set(SerialImpl libs/serial/src/impl/win.cc)
-ELSE()
+if (APPLE)
     set(SerialImpl libs/serial/src/impl/unix.cc)
-ENDIF()
+    set(SerialListPortsImpl libs/serial/src/impl/list_ports/list_ports_osx.cc)
+elseif (UNIX)
+    set(SerialImpl libs/serial/src/impl/unix.cc)
+    set(SerialListPortsImpl libs/serial/src/impl/list_ports/list_ports_linux.cc)
+else ()
+    set(SerialImpl libs/serial/src/impl/win.cc)
+    set(SerialListPortsImpl libs/serial/src/impl/list_ports/list_ports_win.cc)
+endif ()
 
 target_sources(serial
     PRIVATE
         libs/serial/src/serial.cc
+        libs/serial/include/serial/serial.h
+        libs/serial/include/serial/v8stdint.h
         ${SerialImpl}
+        ${SerialListPortsImpl}
 )
+
+if (APPLE)
+    target_link_libraries(serial
+        "-framework IOKit"
+        "-framework Foundation"
+    )
+elseif (UNIX)
+    target_link_libraries(serial
+        rt
+        pthread
+    )
+else ()
+    target_link_libraries(serial
+        setupapi
+    )
+endif ()
 
 target_include_directories(serial 
     PUBLIC
@@ -40,7 +53,7 @@ target_include_directories(serial
 )
 
 # SerialManager library
-add_library(SerialManager)
+add_library(SerialManager SHARED)
 target_sources(SerialManager
     PRIVATE
         src/SerialManager.cpp
@@ -56,7 +69,6 @@ target_link_libraries(SerialManager
     PUBLIC
         serial
         nlohmann_json::nlohmann_json
-        GetComPortList
 )
 
 # SerialTool executable
