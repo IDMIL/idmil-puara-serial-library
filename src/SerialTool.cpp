@@ -55,7 +55,7 @@ int main() {
         }
         else {
             int portIdx = (choice - 2) / 2;
-            bool configuring = (choice % 2 == 1);
+            bool configuring = (choice % 2 == 0);
             modificationMenu(ports[portIdx], configuring);
         }
     }
@@ -92,7 +92,16 @@ void modificationMenu(PuaraAPI::SerialManager::SerialPort& port, bool configurat
         std::cin >> path;
 
         std::ifstream f(path);
+
         modificationJson = json::parse(f);
+
+        // try {
+            
+        // }
+        // catch (...) {
+        //     std::cout << "Could not parse JSON. Please try again.";
+        //     return;
+        // }
     }
     else {
         // Constructs the JSON via user prompts
@@ -118,7 +127,7 @@ void modificationMenu(PuaraAPI::SerialManager::SerialPort& port, bool configurat
             std::cout << "Config failed, please try again." << std::endl;
         }
         else {
-            std::cout << "Config succeeded! Rebooting..." << std::endl;
+            std::cout << "Config succeeded!" << std::endl;
         }
     }
     else {
@@ -126,7 +135,7 @@ void modificationMenu(PuaraAPI::SerialManager::SerialPort& port, bool configurat
             std::cout << "Settings change failed, please try again." << std::endl;
         }
         else {
-            std::cout << "Settings change succeeded! Rebooting..." << std::endl;
+            std::cout << "Settings change succeeded!" << std::endl;
         }
     }
 }

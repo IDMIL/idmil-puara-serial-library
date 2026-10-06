@@ -20,6 +20,7 @@ static inline void DEBUG_PRINT(const std::string& msg) {
 
 static const unsigned BAUD_RATE = 115200;
 static const uint32_t READ_WRITE_TIMEOUT_MS = 1000;
+static const uint32_t CONFIGURE_REBOOT_WAIT_MS = 3000;
 
 namespace PuaraAPI {
 
@@ -30,16 +31,8 @@ namespace PuaraAPI {
 class SerialManager {
 public:
     typedef std::shared_ptr<serial::Serial> SerialPort;
-
-    /**
-     * Dev-friendly struct representing the possible config settings for a Puara device
-     */
-    struct ConfigSettings {
-        std::string wifiSsid;
-        std::string wifiPw;
-        std::string destinationIp;
-        std::string destinationPort;
-    };
+    
+    const uint32_t sendCommandCooldownMS = 1000;
 
     SerialManager() = delete;
     

@@ -58,7 +58,8 @@ std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::st
     }
     else if (command == "whatareyou" || command == "readconfig" || command == "readsettings") {
         response = port->readline(65536UL, ">>>");
-        response = response.substr(3, response.size() - 6);
+        size_t startIdx = response.find("<<<");
+        response = response.substr(startIdx + 3, response.size() - startIdx - 6);
     }
 
     return response;
@@ -95,6 +96,7 @@ std::vector<std::string> PuaraAPI::SerialManager::sendCommandMultiple(std::vecto
 
 bool PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& configSettings) {
     std::string currentConfigStr = sendCommand(port, "readconfig");
+    DEBUG_PRINT(std::format("Current config: {}", currentConfigStr));
 
     if (currentConfigStr.empty()) {
         return false;
@@ -103,11 +105,10 @@ bool PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
     json configJson = json::parse(currentConfigStr);
     configJson.merge_patch(configSettings);
 
-    DEBUG_PRINT(configJson.dump());
+    DEBUG_PRINT(std::format("New config: {}", configJson.dump()));
 
     sendCommand(port, std::format("sendconfig {}", configJson.dump()));
     sendCommand(port, "writeconfig");
-
     std::string rebootResponse = sendCommand(port, "reboot");
 
     return !rebootResponse.empty();
@@ -130,5 +131,11 @@ bool PuaraAPI::SerialManager::changeSettings(SerialPort& port, const json& devic
 
     std::string rebootResponse = sendCommand(port, "reboot");
 
-    return !rebootResponse.empty();
+    if (!rebootResponse.empty()) {
+        std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(CONFIGURE_REBOOT_WAIT_MS));
+        port->close();
+        return true;
+    }
+    
+    return false;
 }
