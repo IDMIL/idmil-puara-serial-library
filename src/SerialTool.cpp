@@ -48,9 +48,7 @@ int main() {
         std::cin >> choice;
 
         if (choice == 1) {
-            DEBUG_PRINT("Starting scan");
             PuaraAPI::SerialManager::scan(ports);
-            DEBUG_PRINT("Ending scan");
         }
         else if (choice < 0 || choice > n) {
             invalidMsg();

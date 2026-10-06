@@ -7,8 +7,6 @@
 void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPort>& ports) {
     std::vector<SerialPort> openPorts;
     
-    DEBUG_PRINT("Creating port objects");
-
     for (auto& portInfo : serial::list_ports()) {
         std::string portName = portInfo.port;
 
@@ -17,24 +15,18 @@ void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPo
             continue;
         }
 #endif
-
-        DEBUG_PRINT(std::format("Creating port for {}", portName));
         try {
             openPorts.push_back(std::make_shared<serial::Serial>(
                 portName,
                 BAUD_RATE,
                 serial::Timeout::simpleTimeout(READ_WRITE_TIMEOUT_MS)
             ));
-            DEBUG_PRINT("Success");
         }
-        catch (...) { DEBUG_PRINT("Failure"); }
+        catch (...) { /* nothing */ }
     }
-
-    DEBUG_PRINT("Done creating port objects");
 
     std::vector<std::string> portResponses = sendCommandMultiple(openPorts, "ping");
 
-    DEBUG_PRINT("Moving ports that responded to output vector");
     ports.clear();
 
     for (size_t i = 0; i < portResponses.size(); i++) {
@@ -42,8 +34,6 @@ void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPo
             ports.push_back(openPorts[i]);
         }
     }
-
-    DEBUG_PRINT("Done moving; scan complete");
 }
 
 std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::string& command) {
@@ -67,7 +57,8 @@ std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::st
         response = port->readline();
     }
     else if (command == "whatareyou" || command == "readconfig" || command == "readsettings") {
-        response = port->readline(65536UL, ">>>").substr(3);
+        response = port->readline(65536UL, ">>>");
+        response = response.substr(3, response.size() - 6);
     }
 
     return response;

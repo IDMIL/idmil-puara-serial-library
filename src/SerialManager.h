@@ -3,7 +3,6 @@
 #include <nlohmann/json.hpp>
 #include <serial/serial.h>
 
-#include <ctime>
 #include <format>
 #include <iostream>
 #include <memory>
@@ -13,12 +12,9 @@
 
 using nlohmann::json;
 
-time_t timer;
-
 static inline void DEBUG_PRINT(const std::string& msg) {
 #if DEBUG_MODE == 1
-    auto t = std::to_string(time(&timer));
-    std::cerr << t.substr(t.size() - 4) + " " + msg << std::endl;
+    std::cerr << msg << std::endl;
 #endif
 }
 
