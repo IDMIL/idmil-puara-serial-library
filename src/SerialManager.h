@@ -49,6 +49,7 @@ public:
      * Sends a serial command to the Puara device connected at a given port
      * @param port The serial port
      * @param command The command
+     * @returns The Puara-specific response
      */
     static std::string sendCommand(SerialPort& port, const std::string& command);
     
@@ -63,17 +64,15 @@ public:
      * Sets a Puara device's config settings
      * @param port The serial port the device is connected to
      * @param configSettings A JSON object representing the desired config settings
-     * @returns True if the config was successful, false otherwise
      */
-    static bool changeConfig(SerialPort& port, const json& configSettings);
+    static void changeConfig(SerialPort& port, const json& configSettings);
 
     /**
      * Sets a Puara device's settings
      * @param port The serial port the device is connected to
      * @param configSettings A JSON object representing the desired device settings
-     * @returns True if the change was successful, false otherwise
      */
-    static bool changeSettings(SerialPort& port, const json& deviceSettings);
+    static void changeSettings(SerialPort& port, const json& deviceSettings);
 
 private:
     static std::vector<std::string> getPortAddresses();

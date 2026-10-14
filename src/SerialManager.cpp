@@ -1,8 +1,11 @@
 #include "SerialManager.h"
 
+#include <Timer.h>
+
 #include <cstring>
 #include <latch>
 #include <thread>
+#include <unordered_set>
 
 void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPort>& ports) {
     std::vector<SerialPort> openPorts;
@@ -46,6 +49,7 @@ std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::st
         }
     }
 
+    port->flush();
     port->write(command);
     std::string response = "";
 
@@ -94,12 +98,12 @@ std::vector<std::string> PuaraAPI::SerialManager::sendCommandMultiple(std::vecto
     return result;
 }
 
-bool PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& configSettings) {
+void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& configSettings) {
     std::string currentConfigStr = sendCommand(port, "readconfig");
     DEBUG_PRINT(std::format("Current config: {}", currentConfigStr));
 
     if (currentConfigStr.empty()) {
-        return false;
+        return;
     }
 
     json configJson = json::parse(currentConfigStr);
@@ -107,18 +111,61 @@ bool PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
 
     DEBUG_PRINT(std::format("New config: {}", configJson.dump()));
 
-    sendCommand(port, std::format("sendconfig {}", configJson.dump()));
-    sendCommand(port, "writeconfig");
-    std::string rebootResponse = sendCommand(port, "reboot");
+    Timer t;
+    std::unordered_set<std::string> ignoredKeys; // keys that are too long (command >64 bytes)
 
-    return !rebootResponse.empty();
+    while (configJson.size() > 0) {
+        // Attempting to write json line-by-line
+        for (auto it = configJson.begin(); it != configJson.end(); it++) {
+            std::string command = std::format("sendconfig {}", it->dump());
+            DEBUG_PRINT(std::format("Sending \"{}\"", command));
+
+            if (command.size() > 64) {
+                DEBUG_PRINT(std::format("Unable to send \"{}\"; command exceeds 64 bytes", command));
+                ignoredKeys.insert(it.key());
+                continue;
+            }
+
+            sendCommand(port, command);
+            t.startAndWait(std::chrono::seconds(2), {});
+        }
+
+        DEBUG_PRINT("Writing to device memory");
+        sendCommand(port, "writeconfig");
+        t.startAndWait(std::chrono::seconds(2), {});
+
+        DEBUG_PRINT("Checking results");
+
+        std::string deviceConfigStr = sendCommand(port, "readconfig");
+        json deviceConfigJson = json::parse(deviceConfigStr);
+        json tmp;
+
+        // Checking for keys that failed to update
+        for (auto it = configJson.begin(); it != configJson.end(); it++) {
+            if (!ignoredKeys.contains(it.key()) && deviceConfigJson[it.key()] != it.value()) {
+                DEBUG_PRINT("Device failed to set a config value!");
+                
+                DEBUG_PRINT(std::format("Desired: {}", it->dump()));
+                DEBUG_PRINT(std::format("Actual (on device): {}", deviceConfigJson[it.key()].dump()));
+                
+                tmp.push_back(*it);
+            }
+        }
+
+        configJson = tmp;
+    }
+
+    // When we're all done, reboot
+    sendCommand(port, "reboot");
+
+    return;
 }
 
-bool PuaraAPI::SerialManager::changeSettings(SerialPort& port, const json& deviceSettings) {
+void PuaraAPI::SerialManager::changeSettings(SerialPort& port, const json& deviceSettings) {
     std::string currentSettingsStr = sendCommand(port, "readsettings");
 
     if (currentSettingsStr.empty()) {
-        return false;
+        return;
     }
 
     json settingsJson = json::parse(currentSettingsStr);
@@ -128,14 +175,7 @@ bool PuaraAPI::SerialManager::changeSettings(SerialPort& port, const json& devic
 
     sendCommand(port, std::format("sendsettings {}", settingsJson.dump()));
     sendCommand(port, "writesettings");
-
-    std::string rebootResponse = sendCommand(port, "reboot");
-
-    if (!rebootResponse.empty()) {
-        std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(CONFIGURE_REBOOT_WAIT_MS));
-        port->close();
-        return true;
-    }
+    sendCommand(port, "reboot");
     
-    return false;
+    return;
 }

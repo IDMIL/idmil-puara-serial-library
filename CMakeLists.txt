@@ -52,6 +52,20 @@ target_include_directories(serial
         libs/serial/include
 )
 
+# Timer utility library
+add_library(Timer SHARED)
+target_sources(Timer
+    PRIVATE
+        util/Timer.cpp
+    PUBLIC
+        FILE_SET timerHeader
+        TYPE HEADERS
+        BASE_DIRS
+            util
+        FILES
+            util/Timer.h
+)
+
 # SerialManager library
 add_library(SerialManager SHARED)
 target_sources(SerialManager
@@ -68,6 +82,7 @@ target_sources(SerialManager
 target_link_libraries(SerialManager
     PUBLIC
         serial
+        Timer
         nlohmann_json::nlohmann_json
 )
 

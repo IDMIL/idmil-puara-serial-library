@@ -123,19 +123,11 @@ void modificationMenu(PuaraAPI::SerialManager::SerialPort& port, bool configurat
     }
 
     if (configuration) {
-        if (!PuaraAPI::SerialManager::changeConfig(port, modificationJson)) {
-            std::cout << "Config failed, please try again." << std::endl;
-        }
-        else {
-            std::cout << "Config succeeded!" << std::endl;
-        }
+        PuaraAPI::SerialManager::changeConfig(port, modificationJson);
+        std::cout << "Config succeeded!" << std::endl;
     }
     else {
-        if (!PuaraAPI::SerialManager::changeSettings(port, modificationJson)) {
-            std::cout << "Settings change failed, please try again." << std::endl;
-        }
-        else {
-            std::cout << "Settings change succeeded!" << std::endl;
-        }
+        PuaraAPI::SerialManager::changeSettings(port, modificationJson);
+        std::cout << "Settings change succeeded!" << std::endl;
     }
 }
