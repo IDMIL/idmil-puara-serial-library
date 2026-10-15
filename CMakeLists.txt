@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_CXX_STANDARD 20) # needed for std::format, std::filesystem
 set(CMAKE_CXX_FLAGS "-Wall")
 
