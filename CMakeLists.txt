@@ -54,17 +54,15 @@ target_include_directories(serial
 )
 
 # Timer utility library
-add_library(Timer SHARED)
+add_library(Timer STATIC)
 target_sources(Timer
     PRIVATE
         util/Timer.cpp
+)
+
+target_include_directories(Timer
     PUBLIC
-        FILE_SET timerHeader
-        TYPE HEADERS
-        BASE_DIRS
-            util
-        FILES
-            util/Timer.h
+        util
 )
 
 # SerialManager library
