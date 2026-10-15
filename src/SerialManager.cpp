@@ -39,14 +39,18 @@ void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPo
     }
 }
 
-std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::string& command) {
+std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::string& command, bool useCooldown) {
     if (!port->isOpen()) {
         try {
             port->open();
         }
         catch (...) {
-            return "";
+            return "ERROR";
         }
+    }
+
+    if (useCooldown && !commandCooldownTimer.isDone()) {
+        commandCooldownTimer.waitUntilDone();
     }
 
     port->flush();
@@ -63,7 +67,17 @@ std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::st
     else if (command == "whatareyou" || command == "readconfig" || command == "readsettings") {
         response = port->readline(65536UL, ">>>");
         size_t startIdx = response.find("<<<");
-        response = response.substr(startIdx + 3, response.size() - startIdx - 6);
+
+        if (startIdx == std::string::npos) {
+            response = "ERROR";
+        }
+        else {
+            response = response.substr(startIdx + 3, response.size() - startIdx - 6);
+        }
+    }
+
+    if (useCooldown) {
+        commandCooldownTimer.start(COMMAND_COOLDOWN, {});
     }
 
     return response;
@@ -78,7 +92,7 @@ std::vector<std::string> PuaraAPI::SerialManager::sendCommandMultiple(std::vecto
     std::latch l(ports.size());
 
     auto threadTask = [&](SerialPort& port, const std::string& command, size_t resultIdx){
-        std::string response = sendCommand(port, command);
+        std::string response = sendCommand(port, command, false);
         result[resultIdx] = response;
         l.count_down();
     };
@@ -98,26 +112,38 @@ std::vector<std::string> PuaraAPI::SerialManager::sendCommandMultiple(std::vecto
     return result;
 }
 
-void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& configSettings) {
-    std::string currentConfigStr = sendCommand(port, "readconfig");
-    DEBUG_PRINT(std::format("Current config: {}", currentConfigStr));
+void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& newConfig) {
+    std::string currentConfigStr = "";
+    do {
+        currentConfigStr = sendCommand(port, "readconfig");
+    }
+    while (currentConfigStr == "ERROR");
+    
+    json currentConfigJson = json::parse(currentConfigStr);
 
-    if (currentConfigStr.empty()) {
-        return;
+    DEBUG_PRINT(std::format("Current config: {}", currentConfigJson.dump()));
+    DEBUG_PRINT(std::format("New config: {}", newConfig.dump()));
+
+    json finalConfig {};
+
+    // Isolating config values that need to change
+    for (auto it = newConfig.begin(); it != newConfig.end(); it++) {
+        if (currentConfigJson[it.key()] == it.value()) {
+            DEBUG_PRINT(std::format("Key \"{}\" already set to {}, skipping", it.key(), it.value()));
+        }
+        else {
+            finalConfig[it.key()] = it.value();
+        }
     }
 
-    json configJson = json::parse(currentConfigStr);
-    configJson.merge_patch(configSettings);
+    DEBUG_PRINT(std::format("Final config: {}", finalConfig.dump()));
 
-    DEBUG_PRINT(std::format("New config: {}", configJson.dump()));
-
-    Timer t;
     std::unordered_set<std::string> ignoredKeys; // keys that are too long (command >64 bytes)
 
-    while (configJson.size() > 0) {
+    while (finalConfig.size() > 0) {
         // Attempting to write json line-by-line
-        for (auto it = configJson.begin(); it != configJson.end(); it++) {
-            std::string command = std::format("sendconfig {}", it->dump());
+        for (auto it = finalConfig.begin(); it != finalConfig.end(); it++) {
+            std::string command = std::format("sendconfig {{\"{}\": {}}}", it.key(), it.value());
             DEBUG_PRINT(std::format("Sending \"{}\"", command));
 
             if (command.size() > 64) {
@@ -127,35 +153,37 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
             }
 
             sendCommand(port, command);
-            t.startAndWait(std::chrono::seconds(2), {});
         }
 
-        DEBUG_PRINT("Writing to device memory");
         sendCommand(port, "writeconfig");
-        t.startAndWait(std::chrono::seconds(2), {});
 
         DEBUG_PRINT("Checking results");
 
-        std::string deviceConfigStr = sendCommand(port, "readconfig");
-        json deviceConfigJson = json::parse(deviceConfigStr);
-        json tmp;
+        do {
+            currentConfigStr = sendCommand(port, "readconfig");
+        }
+        while (currentConfigStr == "ERROR");
+        
+        currentConfigJson = json::parse(currentConfigStr);
+        json tmp {};
 
         // Checking for keys that failed to update
-        for (auto it = configJson.begin(); it != configJson.end(); it++) {
-            if (!ignoredKeys.contains(it.key()) && deviceConfigJson[it.key()] != it.value()) {
+        for (auto it = finalConfig.begin(); it != finalConfig.end(); it++) {
+            if (!ignoredKeys.contains(it.key()) && currentConfigJson[it.key()] != it.value()) {
                 DEBUG_PRINT("Device failed to set a config value!");
                 
-                DEBUG_PRINT(std::format("Desired: {}", it->dump()));
-                DEBUG_PRINT(std::format("Actual (on device): {}", deviceConfigJson[it.key()].dump()));
+                DEBUG_PRINT(std::format("Desired: {{\"{}\": {}}}", it.key(), it.value()));
+                DEBUG_PRINT(std::format("Actual (on device): {{\"{}\": {}}}", it.key(), currentConfigJson[it.key()].dump()));
                 
-                tmp.push_back(*it);
+                tmp[it.key()] = it.value();
             }
         }
 
-        configJson = tmp;
+        finalConfig = tmp;
     }
 
-    // When we're all done, reboot
+    // When we're all done, write & reboot
+    DEBUG_PRINT("Done configuring, rebooting...");
     sendCommand(port, "reboot");
 
     return;

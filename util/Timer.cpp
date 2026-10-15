@@ -5,7 +5,7 @@
 
 void Timer::start(std::chrono::duration<long long> duration, std::optional<std::function<void()>> callback) {
     if (isActive()) {
-        timerThread = std::thread {}; // kills any existing thread
+        timerThread.join();
     }
     
     auto threadTask = [this, duration, callback](){

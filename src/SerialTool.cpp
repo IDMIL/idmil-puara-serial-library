@@ -94,14 +94,6 @@ void modificationMenu(PuaraAPI::SerialManager::SerialPort& port, bool configurat
         std::ifstream f(path);
 
         modificationJson = json::parse(f);
-
-        // try {
-            
-        // }
-        // catch (...) {
-        //     std::cout << "Could not parse JSON. Please try again.";
-        //     return;
-        // }
     }
     else {
         // Constructs the JSON via user prompts

@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 #include <serial/serial.h>
+#include <Timer.h>
 
 #include <format>
 #include <iostream>
@@ -20,7 +21,9 @@ static inline void DEBUG_PRINT(const std::string& msg) {
 
 static const unsigned BAUD_RATE = 115200;
 static const uint32_t READ_WRITE_TIMEOUT_MS = 1000;
-static const uint32_t CONFIGURE_REBOOT_WAIT_MS = 3000;
+
+static const std::chrono::seconds COMMAND_COOLDOWN {2};
+static Timer commandCooldownTimer;
 
 namespace PuaraAPI {
 
@@ -49,9 +52,10 @@ public:
      * Sends a serial command to the Puara device connected at a given port
      * @param port The serial port
      * @param command The command
-     * @returns The Puara-specific response
+     * @param useCooldown Start a cooldown timer after the command is sent
+     * @returns The Puara-defined response, or "ERROR" on an unexpected response
      */
-    static std::string sendCommand(SerialPort& port, const std::string& command);
+    static std::string sendCommand(SerialPort& port, const std::string& command, bool useCooldown = true);
     
     /**
      * Sends a serial command to multiple Puara devices connected in parallel
@@ -63,9 +67,9 @@ public:
     /**
      * Sets a Puara device's config settings
      * @param port The serial port the device is connected to
-     * @param configSettings A JSON object representing the desired config settings
+     * @param newConfig A JSON object representing the desired config settings
      */
-    static void changeConfig(SerialPort& port, const json& configSettings);
+    static void changeConfig(SerialPort& port, const json& newConfig);
 
     /**
      * Sets a Puara device's settings
