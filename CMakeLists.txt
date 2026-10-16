@@ -66,7 +66,7 @@ target_include_directories(Timer
 )
 
 # SerialManager library
-add_library(SerialManager SHARED)
+add_library(SerialManager STATIC)
 target_sources(SerialManager
     PRIVATE
         src/SerialManager.cpp
