@@ -188,22 +188,3 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
 
     return;
 }
-
-void PuaraAPI::SerialManager::changeSettings(SerialPort& port, const json& deviceSettings) {
-    std::string currentSettingsStr = sendCommand(port, "readsettings");
-
-    if (currentSettingsStr.empty()) {
-        return;
-    }
-
-    json settingsJson = json::parse(currentSettingsStr);
-    settingsJson.merge_patch(deviceSettings);
-
-    DEBUG_PRINT(settingsJson.dump());
-
-    sendCommand(port, std::format("sendsettings {}", settingsJson.dump()));
-    sendCommand(port, "writesettings");
-    sendCommand(port, "reboot");
-    
-    return;
-}

@@ -70,16 +70,6 @@ public:
      * @param newConfig A JSON object representing the desired config settings
      */
     static void changeConfig(SerialPort& port, const json& newConfig);
-
-    /**
-     * Sets a Puara device's settings
-     * @param port The serial port the device is connected to
-     * @param configSettings A JSON object representing the desired device settings
-     */
-    static void changeSettings(SerialPort& port, const json& deviceSettings);
-
-private:
-    static std::vector<std::string> getPortAddresses();
 };
 
 }

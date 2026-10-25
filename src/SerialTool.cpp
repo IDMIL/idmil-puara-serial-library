@@ -11,7 +11,7 @@ using nlohmann::json;
 
 // Forward declares
 void invalidMsg();
-void modificationMenu(PuaraAPI::SerialManager::SerialPort&, bool);
+void configMenu(PuaraAPI::SerialManager::SerialPort&);
 
 // SIGINT
 void handler(int) {
@@ -37,8 +37,7 @@ int main() {
 
         for (auto& name : deviceNames) {
             msg += std::format("{}. Configure \"{}\"\n", std::to_string(n), name);
-            msg += std::format("{}. Change settings for \"{}\"\n", std::to_string(n + 1), name);
-            n += 2;
+            n += 1;
         }
 
         std::cout << msg;
@@ -54,9 +53,8 @@ int main() {
             invalidMsg();
         }
         else {
-            int portIdx = (choice - 2) / 2;
-            bool configuring = (choice % 2 == 0);
-            modificationMenu(ports[portIdx], configuring);
+            int portIdx = choice - 2;
+            configMenu(ports[portIdx]);
         }
     }
 
@@ -67,45 +65,35 @@ void invalidMsg() {
     std::cout << "Invalid input, please try again." << std::endl;
 }
 
-void modificationMenu(PuaraAPI::SerialManager::SerialPort& port, bool configuration) {
-    std::string msg = (
-        configuration ? "1. Configure via JSON\n2. Configure manually" :
-        "1. Change settings via JSON\n2. Change settings manually"
-    );  
+void configMenu(PuaraAPI::SerialManager::SerialPort& port) {
+    std::string msg = "Configure via JSON\n2. Configure manually";
     std::cout << msg << std::endl;
     
     int choice;
     std::cout << ">> ";
     std::cin >> choice;
 
-    json modificationJson;
+    json configJson;
 
     if (choice == 1) {
         std::string path;
 
-        msg = (
-            configuration ? "Enter the path to the JSON config file: " :
-            "Enter the path to the JSON settings file: "
-        );
+        msg = "Enter the path to the JSON config file: ";
 
         std::cout << msg;
         std::cin >> path;
 
         std::ifstream f(path);
 
-        modificationJson = json::parse(f);
+        configJson = json::parse(f);
     }
     else {
         // Constructs the JSON via user prompts
         // using the existing JSON as a blueprint
-        std::string command = (
-            configuration ? "readconfig" :
-            "readsettings"
-        );
 
-        modificationJson = json::parse(PuaraAPI::SerialManager::sendCommand(port, command));
+        configJson = json::parse(PuaraAPI::SerialManager::sendCommand(port, "readconfig"));
 
-        for (auto& [key, value] : modificationJson.items()) {
+        for (auto& [key, value] : configJson.items()) {
             std::string newValue;
             std::cout << key + ": ";
             std::cin >> newValue;
@@ -114,12 +102,6 @@ void modificationMenu(PuaraAPI::SerialManager::SerialPort& port, bool configurat
         }
     }
 
-    if (configuration) {
-        PuaraAPI::SerialManager::changeConfig(port, modificationJson);
-        std::cout << "Config succeeded!" << std::endl;
-    }
-    else {
-        PuaraAPI::SerialManager::changeSettings(port, modificationJson);
-        std::cout << "Settings change succeeded!" << std::endl;
-    }
+    PuaraAPI::SerialManager::changeConfig(port, configJson);
+    std::cout << "Config succeeded!" << std::endl;
 }
