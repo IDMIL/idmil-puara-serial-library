@@ -24,7 +24,7 @@ Parts of this library implicitly target Puara version 0.3 (particularly `SerialM
 3. Configure: `cmake -B build`
 4. Build: `cmake --build build`
 
-The build products include the library itself (on Mac, it's `build/libSerialManager.dylib`) and a command-line tool executable (`build/SerialTool`).
+The build products include the library itself (on Mac, it's `build/libSerialManager.a`) and a command-line tool executable (`build/SerialTool`).
 
 ## Examples
 
