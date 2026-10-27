@@ -4,6 +4,7 @@
 #include <serial/serial.h>
 #include <Timer.h>
 
+#include <condition_variable>
 #include <format>
 #include <iostream>
 #include <memory>
