@@ -142,6 +142,7 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
     DEBUG_PRINT(std::format("Final config: {}", finalConfig.dump()));
 
     progress->numFieldsTotal = finalConfig.size();
+    progress->cv.notify_all();
 
     std::unordered_set<std::string> ignoredKeys; // keys that are too long (command >64 bytes)
 
@@ -191,7 +192,9 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
         }
 
         finalConfig = failed;
+
         progress->numFieldsChanged = progress->numFieldsTotal - finalConfig.size();
+        progress->cv.notify_all();
     }
 
     // When we're all done, write & reboot

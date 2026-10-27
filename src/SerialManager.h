@@ -66,6 +66,7 @@ public:
     struct ChangeConfigProgress {
         size_t numFieldsChanged = 0;
         size_t numFieldsTotal = 0;
+        std::condition_variable cv;
     };
 
     /**
