@@ -21,21 +21,19 @@ static inline void DEBUG_PRINT(const std::string& msg) {
 
 static const unsigned BAUD_RATE = 115200;
 static const uint32_t READ_WRITE_TIMEOUT_MS = 1000;
+static const std::chrono::seconds COMMAND_COOLDOWN {3};
 
-static const std::chrono::seconds COMMAND_COOLDOWN {2};
 static Timer commandCooldownTimer;
 
 namespace PuaraAPI {
 
 /**
- * Native C++ static library for managing Puara serial devices in non-Arduino software
+ * C++ static library for managing Puara devices over serial
  * @author Ian Doherty
  */
 class SerialManager {
 public:
     typedef std::shared_ptr<serial::Serial> SerialPort;
-    
-    const uint32_t sendCommandCooldownMS = 1000;
 
     SerialManager() = delete;
     
@@ -52,7 +50,8 @@ public:
      * Sends a serial command to the Puara device connected at a given port
      * @param port The serial port
      * @param command The command
-     * @param useCooldown Start a cooldown timer after the command is sent
+     * @param useCooldown Start a cooldown timer after the command is sent. If running in parallel,
+     * this should be set to false.
      * @returns The Puara-defined response, or "ERROR" on an unexpected response
      */
     static std::string sendCommand(SerialPort& port, const std::string& command, bool useCooldown = true);
@@ -64,12 +63,18 @@ public:
      */
     static std::vector<std::string> sendCommandMultiple(std::vector<SerialPort>& ports, const std::string& command);
 
+    struct ChangeConfigProgress {
+        size_t numFieldsChanged = 0;
+        size_t numFieldsTotal = 0;
+    };
+
     /**
      * Sets a Puara device's config settings
      * @param port The serial port the device is connected to
      * @param newConfig A JSON object representing the desired config settings
+     * @param[out] progress An object representing the progress of the config operation
      */
-    static void changeConfig(SerialPort& port, const json& newConfig);
+    static void changeConfig(SerialPort& port, const json& newConfig, ChangeConfigProgress* progress = nullptr);
 };
 
 }

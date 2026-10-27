@@ -112,7 +112,7 @@ std::vector<std::string> PuaraAPI::SerialManager::sendCommandMultiple(std::vecto
     return result;
 }
 
-void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& newConfig) {
+void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& newConfig, ChangeConfigProgress* progress) {
     std::string currentConfigStr = "";
     do {
         currentConfigStr = sendCommand(port, "readconfig");
@@ -125,18 +125,23 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
     DEBUG_PRINT(std::format("New config: {}", newConfig.dump()));
 
     json finalConfig {};
+    size_t numSkipped = 0;
 
     // Isolating config values that need to change
     for (auto it = newConfig.begin(); it != newConfig.end(); it++) {
         if (currentConfigJson[it.key()] == it.value()) {
             DEBUG_PRINT(std::format("Key \"{}\" already set to {}, skipping", it.key(), it.value()));
+            numSkipped++;
         }
         else {
             finalConfig[it.key()] = it.value();
         }
     }
 
+    DEBUG_PRINT(std::format("Skipped {}/{} keys", numSkipped, newConfig.size()));
     DEBUG_PRINT(std::format("Final config: {}", finalConfig.dump()));
+
+    progress->numFieldsTotal = finalConfig.size();
 
     std::unordered_set<std::string> ignoredKeys; // keys that are too long (command >64 bytes)
 
@@ -156,7 +161,6 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
         }
 
         sendCommand(port, "writeconfig");
-
         DEBUG_PRINT("Checking results");
 
         do {
@@ -165,7 +169,9 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
         while (currentConfigStr == "ERROR");
         
         currentConfigJson = json::parse(currentConfigStr);
-        json tmp {};
+        json failed {};
+
+        size_t numFailed = 0;
 
         // Checking for keys that failed to update
         for (auto it = finalConfig.begin(); it != finalConfig.end(); it++) {
@@ -175,11 +181,17 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
                 DEBUG_PRINT(std::format("Desired: {{\"{}\": {}}}", it.key(), it.value()));
                 DEBUG_PRINT(std::format("Actual (on device): {{\"{}\": {}}}", it.key(), currentConfigJson[it.key()].dump()));
                 
-                tmp[it.key()] = it.value();
+                failed[it.key()] = it.value();
+                numFailed++;
             }
         }
 
-        finalConfig = tmp;
+        if (numFailed > 0) {
+            DEBUG_PRINT(std::format("{}/{} keys failed to update ({}%)", numFailed, finalConfig.size(), (int) (100 * ((float) numFailed / (float) finalConfig.size()))));
+        }
+
+        finalConfig = failed;
+        progress->numFieldsChanged = progress->numFieldsTotal - finalConfig.size();
     }
 
     // When we're all done, write & reboot

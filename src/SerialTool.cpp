@@ -50,7 +50,7 @@ int main() {
             PuaraAPI::SerialManager::scan(ports);
         }
         else if (choice < 0 || choice > n) {
-            invalidMsg();
+            std::cout << "Invalid choice, please try again." << std::endl;
         }
         else {
             int portIdx = choice - 2;
@@ -61,12 +61,8 @@ int main() {
     return 0;
 }
 
-void invalidMsg() {
-    std::cout << "Invalid input, please try again." << std::endl;
-}
-
 void configMenu(PuaraAPI::SerialManager::SerialPort& port) {
-    std::string msg = "Configure via JSON\n2. Configure manually";
+    std::string msg = "1. Configure via JSON\n2. Configure manually";
     std::cout << msg << std::endl;
     
     int choice;
@@ -76,18 +72,29 @@ void configMenu(PuaraAPI::SerialManager::SerialPort& port) {
     json configJson;
 
     if (choice == 1) {
-        std::string path;
+        bool finished = false;
 
-        msg = "Enter the path to the JSON config file: ";
+        do {
+            std::string path;
 
-        std::cout << msg;
-        std::cin >> path;
+            msg = "Enter the path to the JSON config file: ";
 
-        std::ifstream f(path);
+            std::cout << msg;
+            std::cin >> path;
 
-        configJson = json::parse(f);
+            std::ifstream f(path);
+
+            try {
+                configJson = json::parse(f);
+                finished = true;
+            }
+            catch (...) {
+                std::cout << "Invalid JSON, please try again.";
+            }
+        }
+        while (finished == false);
     }
-    else {
+    else if (choice == 2) {
         // Constructs the JSON via user prompts
         // using the existing JSON as a blueprint
 
