@@ -4,7 +4,6 @@
 
 #include <cstring>
 #include <latch>
-#include <thread>
 #include <unordered_set>
 
 void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPort>& ports) {
