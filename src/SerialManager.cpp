@@ -142,7 +142,8 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
 
     if (progress != nullptr) {
         progress->mtx.lock();
-        progress->numFieldsTotal = finalConfig.size();
+        progress->numFieldsChanged = numSkipped;
+        progress->numFieldsTotal = newConfig.size();
         progress->mtx.unlock();
         progress->cv.notify_all();
     }
@@ -198,7 +199,7 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
 
         if (progress != nullptr) {
             progress->mtx.lock();
-            progress->numFieldsChanged = progress->numFieldsTotal - finalConfig.size();
+            progress->numFieldsChanged = progress->numFieldsTotal - failed.size();
             progress->mtx.unlock();
             progress->cv.notify_all();
         }
