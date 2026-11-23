@@ -2,7 +2,6 @@
 
 #include <nlohmann/json.hpp>
 #include <serial/serial.h>
-#include <Timer.h>
 
 #include <condition_variable>
 #include <format>
@@ -21,11 +20,10 @@ static inline void DEBUG_PRINT(const std::string& msg) {
 #endif
 }
 
-static const unsigned BAUD_RATE = 115200;
-static const uint32_t READ_WRITE_TIMEOUT_MS = 1000;
+static const unsigned BAUD_RATE = 115'200;
+static const uint32_t READ_WRITE_TIMEOUT_MS = 2'000;
 static const std::chrono::seconds COMMAND_COOLDOWN {3};
-
-static Timer commandCooldownTimer;
+static const std::chrono::seconds CHANGE_CONFIG_TIMEOUT {30};
 
 namespace PuaraAPI {
 
@@ -42,7 +40,6 @@ public:
     /**
      * Scans for all serial ports connected to Puara devices
      * @returns A vector of SerialPort objects
-     * @note Mask must be a predefined vector that is the same size as `ports`
      * @note Puara devices are detected when the reply "pong" to a "ping" command. A Puara-specific
      * serial command with a unique identifier may be more secure/reliable.
      */
@@ -74,13 +71,16 @@ public:
         std::condition_variable cv;
     };
 
+    enum ChangeConfigResult { SUCCESS, TIMEOUT, COMMAND_LENGTH_EXCEEDED };
+
     /**
      * Sets a Puara device's config settings
      * @param port The serial port the device is connected to
      * @param newConfig A JSON object representing the desired config settings
      * @param[out] progress An object representing the progress of the config operation
+     * @returns ChangeConfigResult::SUCCESS upon success or a corresponding error code
      */
-    static void changeConfig(SerialPort& port, const json& newConfig, ChangeConfigProgress* progress = nullptr);
+    static ChangeConfigResult changeConfig(SerialPort& port, const json& newConfig, ChangeConfigProgress* progress = nullptr);
 };
 
 }

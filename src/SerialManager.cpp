@@ -32,7 +32,7 @@ void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPo
     ports.clear();
 
     for (size_t i = 0; i < portResponses.size(); i++) {
-        if (!portResponses[i].empty()) {
+        if (portResponses[i] == "pong") {
             ports.push_back(openPorts[i]);
         }
     }
@@ -46,10 +46,6 @@ std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::st
         catch (...) {
             return "ERROR";
         }
-    }
-
-    if (useCooldown && !commandCooldownTimer.isDone()) {
-        commandCooldownTimer.waitUntilDone();
     }
 
     port->flush();
@@ -76,7 +72,8 @@ std::string PuaraAPI::SerialManager::sendCommand(SerialPort& port, const std::st
     }
 
     if (useCooldown) {
-        commandCooldownTimer.start(COMMAND_COOLDOWN, {});
+        Timer commandCooldownTimer;
+        commandCooldownTimer.startAndWait(COMMAND_COOLDOWN, {});
     }
 
     return response;
@@ -111,7 +108,7 @@ std::vector<std::string> PuaraAPI::SerialManager::sendCommandMultiple(std::vecto
     return result;
 }
 
-void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& newConfig, ChangeConfigProgress* progress) {
+PuaraAPI::SerialManager::ChangeConfigResult PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& newConfig, ChangeConfigProgress* progress) {
     std::string currentConfigStr = "";
     do {
         currentConfigStr = sendCommand(port, "readconfig");
@@ -149,8 +146,12 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
     }
     
     std::unordered_set<std::string> ignoredKeys; // keys that are too long (command >64 bytes)
+    bool timeout = false;
 
-    while (finalConfig.size() > 0) {
+    Timer timeoutTimer;
+    timeoutTimer.start(CHANGE_CONFIG_TIMEOUT, [&](){ timeout = true; });
+
+    while (finalConfig.size() > 0 && timeout == false) {
         // Attempting to write json line-by-line
         for (auto it = finalConfig.begin(); it != finalConfig.end(); it++) {
             std::string command = std::format("sendconfig {{\"{}\": {}}}", it.key(), it.value());
@@ -158,8 +159,7 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
 
             if (command.size() > 64) {
                 DEBUG_PRINT(std::format("Unable to send \"{}\"; command exceeds 64 bytes", command));
-                ignoredKeys.insert(it.key());
-                continue;
+                return ChangeConfigResult::COMMAND_LENGTH_EXCEEDED;
             }
 
             sendCommand(port, command);
@@ -205,9 +205,16 @@ void PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& 
         }
     }
 
-    // When we're all done, write & reboot
-    DEBUG_PRINT("Done configuring, rebooting...");
-    sendCommand(port, "reboot");
+    if (timeout) {
+        DEBUG_PRINT(std::format("changeConfig failed: timeout (>{}s)", std::to_string(CHANGE_CONFIG_TIMEOUT.count())));
+        return ChangeConfigResult::TIMEOUT;
+    }
+    else {
+        // When we're all done, write & reboot
+        DEBUG_PRINT("Done configuring, rebooting...");
+        sendCommand(port, "reboot");
+        port->close();
 
-    return;
+        return ChangeConfigResult::SUCCESS;
+    }
 }

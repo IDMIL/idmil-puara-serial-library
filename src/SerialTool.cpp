@@ -2,7 +2,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <csignal>
 #include <format>
 #include <fstream>
 #include <iostream>
@@ -13,21 +12,14 @@ using nlohmann::json;
 void invalidMsg();
 void configMenu(PuaraAPI::SerialManager::SerialPort&);
 
-// SIGINT
-void handler(int) {
-    exit(0);
-}
+std::vector<PuaraAPI::SerialManager::SerialPort> ports;
 
 int main() {
-    std::signal(SIGINT, handler);
-
     std::cout << 
         "Puara Serial Tool: Command-line utility for managing Puara instruments over serial\n"
         "Version 0.1\n" 
         "Created by Ian Doherty, September 2026\n"
     << std::endl;
-
-    std::vector<PuaraAPI::SerialManager::SerialPort> ports;
 
     while (1) {
         std::string msg = "1. Scan\n";
@@ -42,14 +34,23 @@ int main() {
 
         std::cout << msg;
 
-        int choice;
+        std::string choiceStr;
         std::cout << ">> ";
-        std::cin >> choice;
+        std::cin >> choiceStr;
+        int choice;
+
+        try {
+            choice = std::stoi(choiceStr);
+        }
+        catch (...) {
+            std::cout << "Please input a number." << std::endl;
+            continue;
+        }
 
         if (choice == 1) {
             PuaraAPI::SerialManager::scan(ports);
         }
-        else if (choice < 0 || choice > n) {
+        else if (choice <= 0 || choice >= n) {
             std::cout << "Invalid choice, please try again." << std::endl;
         }
         else {
@@ -65,50 +66,83 @@ void configMenu(PuaraAPI::SerialManager::SerialPort& port) {
     std::string msg = "1. Configure via JSON\n2. Configure manually";
     std::cout << msg << std::endl;
     
-    int choice;
-    std::cout << ">> ";
-    std::cin >> choice;
-
     json configJson;
+    int choice;
 
-    if (choice == 1) {
-        bool finished = false;
+    do {
+        std::string choiceStr;
+        std::cout << ">> ";
+        std::cin >> choiceStr;
 
-        do {
-            std::string path;
+        try {
+            choice = std::stoi(choiceStr);
+        }
+        catch (...) {
+            std::cout << "Please input a number." << std::endl;
+            continue;
+        }
 
-            msg = "Enter the path to the JSON config file: ";
+        if (choice == 1) {
+            bool finished = false;
 
-            std::cout << msg;
-            std::cin >> path;
+            do {
+                std::string path;
 
-            std::ifstream f(path);
+                msg = "Enter the path to the JSON config file: ";
 
-            try {
-                configJson = json::parse(f);
-                finished = true;
+                std::cout << msg;
+                std::cin >> path;
+
+                std::ifstream f(path);
+
+                try {
+                    configJson = json::parse(f);
+                    finished = true;
+                }
+                catch (...) {
+                    std::cout << "Invalid JSON, please try again.";
+                }
             }
-            catch (...) {
-                std::cout << "Invalid JSON, please try again.";
+            while (finished == false);
+        }
+        else if (choice == 2) {
+            // Constructs the JSON via user prompts
+            // using the existing JSON as a blueprint
+
+            configJson = json::parse(PuaraAPI::SerialManager::sendCommand(port, "readconfig"));
+
+            for (auto& [key, value] : configJson.items()) {
+                std::string newValue;
+                std::cout << key + ": ";
+                std::cin >> newValue;
+
+                if (value.is_number()) {
+                    value = std::stoi(newValue);
+                }
+                else {
+                    value = newValue;
+                }
             }
         }
-        while (finished == false);
+        else {
+            std::cout << "Invalid choice, please try again." << std::endl;
+        }
     }
-    else if (choice == 2) {
-        // Constructs the JSON via user prompts
-        // using the existing JSON as a blueprint
+    while (choice != 1 && choice != 2);
 
-        configJson = json::parse(PuaraAPI::SerialManager::sendCommand(port, "readconfig"));
+    PuaraAPI::SerialManager::ChangeConfigResult res = PuaraAPI::SerialManager::changeConfig(port, configJson);
 
-        for (auto& [key, value] : configJson.items()) {
-            std::string newValue;
-            std::cout << key + ": ";
-            std::cin >> newValue;
-
-            value = newValue;
+    switch (res) {
+        case PuaraAPI::SerialManager::ChangeConfigResult::SUCCESS: {
+            std::cout << "Config succeeded!" << std::endl;
+        }
+        case PuaraAPI::SerialManager::ChangeConfigResult::TIMEOUT: {
+            std::cout << "Config failed due to timeout" << std::endl;
+        }
+        case PuaraAPI::SerialManager::ChangeConfigResult::COMMAND_LENGTH_EXCEEDED: {
+            std::cout << "Config failed due to commands exceeding 64 bytes" << std::endl;
         }
     }
 
-    PuaraAPI::SerialManager::changeConfig(port, configJson);
-    std::cout << "Config succeeded!" << std::endl;
+    ports.clear();
 }

@@ -8,37 +8,23 @@ void Timer::start(std::chrono::duration<long long> duration, std::optional<std::
         timerThread.join();
     }
     
-    auto threadTask = [this, duration, callback](){
-        this->done = false;
+    auto threadTask = [&](){
         std::chrono::time_point<std::chrono::system_clock> end = std::chrono::system_clock::now() + duration;
-
         std::this_thread::sleep_until(end);
 
         if (callback) {
             (*callback)();
         }
-
-        this->done = true;
     };
 
     timerThread = std::thread(threadTask);
 }
 
-void Timer::waitUntilDone() {
-    if (isActive()) {
-        timerThread.join();
-    }
-}
-
 void Timer::startAndWait(std::chrono::duration<long long> duration, std::optional<std::function<void()>> callback) {
     start(duration, callback);
-    waitUntilDone();
+    timerThread.join();
 }
 
 bool Timer::isActive() {
     return timerThread.joinable();
-}
-
-bool Timer::isDone() {
-    return done;
 }

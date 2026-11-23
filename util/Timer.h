@@ -17,11 +17,6 @@ public:
      * @param callback An optional callback function that runs once the timer finishes
      */
     void start(std::chrono::duration<long long> duration, std::optional<std::function<void()>> callback);
-    
-    /**
-     * Causes the calling thread to wait on the timer
-     */
-    void waitUntilDone();
 
     /**
      * Starts the timer and waits for it to finish
@@ -35,12 +30,6 @@ public:
      */
     bool isActive();
 
-    /**
-     * Returns true if the timer is done, false otherwise
-     */
-    bool isDone();
-
 private:
     std::thread timerThread;
-    bool done = false;
 };
