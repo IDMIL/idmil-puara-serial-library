@@ -39,11 +39,12 @@ public:
     
     /**
      * Scans for all serial ports connected to Puara devices
-     * @returns A vector of SerialPort objects
+     * @param[out] ports A vector of SerialPort objects
+     * @param skipPorts An optional vector of ports you would like to skip scanning for
      * @note Puara devices are detected when the reply "pong" to a "ping" command. A Puara-specific
      * serial command with a unique identifier may be more secure/reliable.
      */
-    static void scan(std::vector<SerialPort>& ports);
+    static void scan(std::vector<SerialPort>& ports, std::vector<SerialPort> skipPorts = {});
 
     /**
      * Sends a serial command to the Puara device connected at a given port

@@ -6,11 +6,17 @@
 #include <latch>
 #include <unordered_set>
 
-void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPort>& ports) {
+void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPort>& ports, std::vector<PuaraAPI::SerialManager::SerialPort> skipPorts) {
     std::vector<SerialPort> openPorts;
     
     for (auto& portInfo : serial::list_ports()) {
         std::string portName = portInfo.port;
+
+        for (auto& skipPort : skipPorts) {
+            if (skipPort->getPort() == portName) {
+                continue;
+            }
+        }
 
 #if __APPLE__
         if (portName.find("Bluetooth") != std::string::npos || portName.find("debug") != std::string::npos) {
