@@ -72,7 +72,7 @@ public:
         std::condition_variable cv;
     };
 
-    enum ChangeConfigResult { SUCCESS, TIMEOUT };
+    enum ChangeConfigResult { SUCCESS, TIMEOUT, COMMAND_LENGTH_EXCEEDED };
 
     /**
      * Sets a Puara device's config settings
