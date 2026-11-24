@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_CXX_STANDARD 20) # needed for std::format, std::filesystem
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -g")
 
 project(idmil-puara-serial-library)
 

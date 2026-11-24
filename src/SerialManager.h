@@ -16,14 +16,14 @@ using nlohmann::json;
 
 static inline void DEBUG_PRINT(const std::string& msg) {
 #if DEBUG_MODE == 1
-    std::cerr << msg << std::endl;
+    std::cerr << msg + "\n";
 #endif
 }
 
 static const unsigned BAUD_RATE = 115'200;
 static const uint32_t READ_WRITE_TIMEOUT_MS = 2'000;
 static const std::chrono::seconds COMMAND_COOLDOWN {3};
-static const std::chrono::seconds CHANGE_CONFIG_TIMEOUT {30};
+static const std::chrono::seconds CHANGE_CONFIG_TIMEOUT {90};
 
 namespace PuaraAPI {
 

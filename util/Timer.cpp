@@ -3,21 +3,40 @@
 #include <exception>
 #include <thread>
 
-void Timer::start(std::chrono::duration<long long> duration, std::optional<std::function<void()>> callback) {
-    if (isActive()) {
-        timerThread.join();
+Timer::~Timer() {
+    if (timerThread.joinable()) {
+        stop(true);
     }
-    
-    auto threadTask = [&](){
-        std::chrono::time_point<std::chrono::system_clock> end = std::chrono::system_clock::now() + duration;
-        std::this_thread::sleep_until(end);
+}
 
-        if (callback) {
+void Timer::start(std::chrono::duration<long long> duration, std::optional<std::function<void()>> callback) {
+    done = false;
+    overrideCallback = false;
+
+    auto timerThreadTask = [this, duration, callback](){
+        std::unique_lock lk {mtx};
+
+        cv.wait_for(lk, duration, [this](){ return done; });
+        lk.unlock();
+
+        if (callback && !overrideCallback) {
             (*callback)();
         }
     };
 
-    timerThread = std::thread(threadTask);
+    timerThread = std::thread(timerThreadTask);
+}
+
+void Timer::stop(bool overrideCallback) {
+    this->overrideCallback = overrideCallback;
+
+    {
+        std::lock_guard<std::mutex> lk(mtx);
+        done = true;
+    }
+    
+    cv.notify_one();
+    timerThread.join();
 }
 
 void Timer::startAndWait(std::chrono::duration<long long> duration, std::optional<std::function<void()>> callback) {
@@ -26,5 +45,5 @@ void Timer::startAndWait(std::chrono::duration<long long> duration, std::optiona
 }
 
 bool Timer::isActive() {
-    return timerThread.joinable();
+    return !done;
 }

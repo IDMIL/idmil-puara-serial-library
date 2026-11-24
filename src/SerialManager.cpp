@@ -2,6 +2,7 @@
 
 #include <Timer.h>
 
+#include <atomic>
 #include <cstring>
 #include <latch>
 #include <unordered_set>
@@ -38,7 +39,8 @@ void PuaraAPI::SerialManager::scan(std::vector<PuaraAPI::SerialManager::SerialPo
     ports.clear();
 
     for (size_t i = 0; i < portResponses.size(); i++) {
-        if (portResponses[i] == "pong") {
+        DEBUG_PRINT(portResponses[i]);
+        if (portResponses[i] == "pong\r\n") {
             ports.push_back(openPorts[i]);
         }
     }
@@ -117,9 +119,11 @@ std::vector<std::string> PuaraAPI::SerialManager::sendCommandMultiple(std::vecto
 PuaraAPI::SerialManager::ChangeConfigResult PuaraAPI::SerialManager::changeConfig(PuaraAPI::SerialManager::SerialPort& port, const json& newConfig, ChangeConfigProgress* progress) {
     std::string currentConfigStr = "";
     do {
+       DEBUG_PRINT("Trying to readconfig");
         currentConfigStr = sendCommand(port, "readconfig");
     }
     while (currentConfigStr == "ERROR");
+    DEBUG_PRINT("Done");
     
     json currentConfigJson = json::parse(currentConfigStr);
 
@@ -152,7 +156,7 @@ PuaraAPI::SerialManager::ChangeConfigResult PuaraAPI::SerialManager::changeConfi
     }
     
     std::unordered_set<std::string> ignoredKeys; // keys that are too long (command >64 bytes)
-    bool timeout = false;
+    std::atomic<bool> timeout = false;
 
     Timer timeoutTimer;
     timeoutTimer.start(CHANGE_CONFIG_TIMEOUT, [&](){ timeout = true; });
@@ -216,6 +220,8 @@ PuaraAPI::SerialManager::ChangeConfigResult PuaraAPI::SerialManager::changeConfi
         return ChangeConfigResult::TIMEOUT;
     }
     else {
+        timeoutTimer.stop(false);
+
         // When we're all done, write & reboot
         DEBUG_PRINT("Done configuring, rebooting...");
         sendCommand(port, "reboot");

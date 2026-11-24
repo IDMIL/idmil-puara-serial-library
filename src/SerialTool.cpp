@@ -135,12 +135,15 @@ void configMenu(PuaraAPI::SerialManager::SerialPort& port) {
     switch (res) {
         case PuaraAPI::SerialManager::ChangeConfigResult::SUCCESS: {
             std::cout << "Config succeeded!" << std::endl;
+            break;
         }
         case PuaraAPI::SerialManager::ChangeConfigResult::TIMEOUT: {
             std::cout << "Config failed due to timeout" << std::endl;
+            break;
         }
         case PuaraAPI::SerialManager::ChangeConfigResult::COMMAND_LENGTH_EXCEEDED: {
             std::cout << "Config failed due to commands exceeding 64 bytes" << std::endl;
+            break;
         }
     }
 
