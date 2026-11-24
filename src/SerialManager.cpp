@@ -166,12 +166,6 @@ PuaraAPI::SerialManager::ChangeConfigResult PuaraAPI::SerialManager::changeConfi
         for (auto it = finalConfig.begin(); it != finalConfig.end(); it++) {
             std::string command = std::format("sendconfig {{\"{}\": {}}}", it.key(), it.value());
             DEBUG_PRINT(std::format("Sending \"{}\"", command));
-
-            if (command.size() > 64) {
-                DEBUG_PRINT(std::format("Unable to send \"{}\"; command exceeds 64 bytes", command));
-                return ChangeConfigResult::COMMAND_LENGTH_EXCEEDED;
-            }
-
             sendCommand(port, command);
         }
 
